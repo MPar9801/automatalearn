@@ -208,3 +208,76 @@ def test_app_tab1_user_input_tester():
     assert any("Invalid Input" in e.value for e in at.error)
 
 
+def test_app_custom_regex_pipeline():
+    """Verify complete end-to-end UI custom regex compilation, acceptance, error recovery, and alphabet changes."""
+    at = AppTest.from_file(APP_PATH, default_timeout=60)
+    at.run()
+    assert not at.exception
+
+    # 1. Compile valid custom regex: (a+b)*abb(a+b)*
+    re_input = at.text_input(key="custom_re_input")
+    re_input.input("(a+b)*abb(a+b)*")
+    btn_compile = [b for b in at.button if b.key == "btn_compile_custom_re"][0]
+    btn_compile.click().run()
+    assert not at.exception
+
+    cur_lang = at.session_state["current_language"]
+    assert cur_lang.key == "custom_regex"
+    assert "(a+b)*abb(a+b)*" in cur_lang.name
+
+    # 2. Evaluate accepted strings: abb, aabb, babba
+    for s_acc in ["abb", "aabb", "babba"]:
+        inp = at.text_input(key="tab1_user_input_widget")
+        inp.input(s_acc)
+        btn_test = [b for b in at.button if b.key == "btn_tab1_run"][0]
+        btn_test.click().run()
+        assert not at.exception
+        assert at.session_state["tab1_eval_str"] == s_acc
+        assert any("ACCEPTED" in m.value for m in at.markdown)
+
+    # 3. Evaluate rejected strings: a, b, ab, ba
+    for s_rej in ["a", "b", "ab", "ba"]:
+        inp = at.text_input(key="tab1_user_input_widget")
+        inp.input(s_rej)
+        btn_test = [b for b in at.button if b.key == "btn_tab1_run"][0]
+        btn_test.click().run()
+        assert not at.exception
+        assert any("REJECTED" in m.value for m in at.markdown)
+
+    # 4. Enter invalid regex and verify readable validation error appears
+    re_input = at.text_input(key="custom_re_input")
+    re_input.input("(a+b")
+    btn_compile = [b for b in at.button if b.key == "btn_compile_custom_re"][0]
+    btn_compile.click().run()
+    assert not at.exception
+    assert any("Failed to compile regex" in e.value for e in at.error)
+    # 7. Failed compilation must NOT replace language with new failed regex
+    assert at.session_state["current_language"].regex == "(a+b)*abb(a+b)*"
+
+    # 5. Enter input containing symbol outside configured alphabet
+    inp = at.text_input(key="tab1_user_input_widget")
+    inp.input("xyz")
+    btn_test = [b for b in at.button if b.key == "btn_tab1_run"][0]
+    btn_test.click().run()
+    assert not at.exception
+    assert any("Invalid Input" in e.value for e in at.error)
+
+    # 6 & 8. Change configured alphabet to '0, 1' and compile (0+1)*01
+    alpha_input = at.text_input(key="custom_re_alpha")
+    alpha_input.input("0, 1")
+    re_input = at.text_input(key="custom_re_input")
+    re_input.input("(0+1)*01")
+    btn_compile = [b for b in at.button if b.key == "btn_compile_custom_re"][0]
+    btn_compile.click().run()
+    assert not at.exception
+
+    cur_lang2 = at.session_state["current_language"]
+    assert cur_lang2.alphabet == ["0", "1"]
+    assert cur_lang2.dfa.accepts("01")
+    assert cur_lang2.dfa.accepts("001")
+    assert not cur_lang2.dfa.accepts("0")
+    assert not cur_lang2.dfa.accepts("abb")
+
+
+
+

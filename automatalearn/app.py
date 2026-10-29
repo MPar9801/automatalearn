@@ -385,7 +385,7 @@ with tabs[0]:
                 st.write("")
                 if st.button("Compile Regex to DFA", type="primary", use_container_width=True, key="btn_compile_custom_re"):
                     try:
-                        nfa = regex_to_nfa(custom_re)
+                        nfa = regex_to_nfa(custom_re, alphabet=custom_alpha)
                         raw_dfa = nfa.to_dfa()
                         min_res = minimize_dfa(raw_dfa)
                         compiled_dfa = min_res.minimized_dfa
